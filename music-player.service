@@ -1,0 +1,30 @@
+[Unit]
+Description=Remote Music Server (mpv + Express)
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Must be a real user with access to the audio device.
+User=youruser
+Group=audio
+WorkingDirectory=/opt/music-server
+
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOST=0.0.0.0
+Environment=MUSIC_DIR=/srv/music
+# Uncomment and set if mpv picks the wrong output:
+# Environment=AUDIO_DEVICE=alsa/hw:1,0
+# Uncomment to require a shared secret:
+# Environment=AUTH_TOKEN=change-me
+
+# Needed for PipeWire/PulseAudio on a headless box:
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

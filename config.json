@@ -1,0 +1,32 @@
+{
+  "timezone": "Asia/Manila",
+  "autoStop": {
+    "enabled": true,
+    "time": "16:00",
+    "fadeSeconds": 10,
+    "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  "podcast": {
+    "enabled": false,
+    "time": "15:00",
+    "days": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "feedUrl": "https://feeds.transistor.fm/our-daily-bread-podcast",
+    "mode": "interrupt"
+  }
+}

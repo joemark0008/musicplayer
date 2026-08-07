@@ -1,0 +1,26 @@
+{
+  "name": "remote-music-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless music player: audio plays on the server, control UI runs in your browser.",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "client:install": "npm --prefix client install",
+    "client:dev": "npm --prefix client run dev",
+    "build": "npm --prefix client install && npm --prefix client run build",
+    "setup": "npm install && npm run build",
+    "test": "node test/schedule-test.js && node test/playlist-test.js && node test/smoke-test.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "music-metadata": "^10.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,45 @@
+# Audio needs to escape the container, so this file is Linux-only.
+# See README "Docker" for why it can't work on Docker Desktop for Mac/Windows.
+
+services:
+  music-server:
+    build: .
+    image: remote-music-server
+    container_name: music-server
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    volumes:
+      # Your music. NOT read-only: playlists are folders and downloads are
+      # files, both written under /music/Playlists.
+      - ${MUSIC_DIR:-/srv/music}:/music
+      # Schedule settings, so they survive `docker compose up --build`.
+      - ./config.json:/app/config.json
+
+    environment:
+      MUSIC_DIR: /music
+      CONFIG_PATH: /app/config.json
+      # Uncomment if mpv picks the wrong output (see `docker exec music-server mpv --audio-device=help`)
+      # AUDIO_DEVICE: alsa/default
+      # Uncomment to require a shared secret; open the UI as /?token=...
+      # AUTH_TOKEN: change-me
+
+    # ---- audio path A: ALSA directly (simplest, needs no host sound server) ----
+    devices:
+      - /dev/snd:/dev/snd
+    group_add:
+      - audio
+
+    # ---- audio path B: PipeWire / PulseAudio on the host ----
+    # Comment out the `devices`/`group_add` block above, uncomment this, and set
+    # UID to your host user id (`id -u`). The container talks to the host's
+    # sound server over its unix socket instead of grabbing the card directly.
+    #
+    # environment:
+    #   PULSE_SERVER: unix:/run/pulse/native
+    # volumes:
+    #   - ${MUSIC_DIR:-/srv/music}:/music:ro
+    #   - /run/user/1000/pulse/native:/run/pulse/native
+    #   - ~/.config/pulse/cookie:/home/node/.config/pulse/cookie:ro

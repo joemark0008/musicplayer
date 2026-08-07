@@ -1,0 +1,11 @@
+node_modules
+client/node_modules
+client/dist
+test
+.git
+.gitignore
+*.md
+*.log
+.env
+.DS_Store
+music-player.service
