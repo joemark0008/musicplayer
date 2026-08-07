@@ -1,0 +1,9 @@
+# Node 20+ — Ubuntu's default is too old, use NodeSource
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# playback + downloads
+sudo apt install -y mpv ffmpeg
+
+# yt-dlp — apt's version lags and breaks; use pipx
+sudo apt install -y pipx && pipx install yt-dlp
