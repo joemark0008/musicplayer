@@ -253,6 +253,26 @@ npm test
   speaks mpv's IPC protocol but plays nothing. The podcast tests run against a
   throwaway local feed server.
 
+## Raspberry Pi one-shot install
+
+```bash
+cd music-server
+chmod +x install-pi.sh
+./install-pi.sh --music-dir /mnt/usb/Music
+```
+
+Installs mpv, ffmpeg, Node 22 and yt-dlp, checks the sound card, adds you to the
+`audio` group, builds the UI, writes a systemd unit with the right paths and uid,
+enables lingering (so audio works with nobody logged in), and starts it. Prints
+the URL when it's done.
+
+It's safe to re-run — a second pass skips what's already installed and just
+rebuilds and restarts. See what it would do first with `--dry-run`, and remove
+the service with `--uninstall` (your music is never touched). `--help` lists
+the rest.
+
+Needs 64-bit Raspberry Pi OS on a Pi 3 or newer; it refuses to run on armv6.
+
 ## Run as a service
 
 Copy `music-player.service` to `/etc/systemd/system/`, edit the paths and user, then:
