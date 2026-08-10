@@ -104,10 +104,19 @@ stand before pointing this at a commercial music video.
 
 ## Schedules
 
-The **Schedule** tab has two jobs. Both are off until you enable them, both save
-the moment you change them, and both fire on the timezone set at the top of the
+The **Schedule** tab has three jobs. All are off until you enable them, all save
+the moment you change them, and all fire on the timezone set at the top of the
 tab — **Asia/Manila** by default, so "15:00" means 3PM Philippine time no matter
 what the server's own clock says.
+
+### Auto-start (8AM)
+
+Picks a playlist and plays it. Optionally shuffles, and optionally sets the
+volume first so last night's level can't ambush you at breakfast.
+
+If the chosen playlist is missing or empty the job errors loudly in the log
+rather than playing something arbitrary. A renamed playlist shows as
+`(missing)` in the dropdown instead of being silently swapped for another.
 
 ### Daily podcast (3PM)
 
@@ -126,9 +135,14 @@ skips a day or posts a bonus episode.
 mpv streams the episode URL directly. Nothing is downloaded, so this works fine
 with a small disk.
 
-At 3PM it stops whatever music is playing, plays that episode, and stops when
-it ends — the music queue is left untouched, so you can hit play afterwards and
-carry on where you were.
+At 3PM it interrupts whatever music is playing and plays the episode. With
+**"resume the music where it left off"** ticked (the default) it bookmarks the
+track and position first, then picks up mid-song — rewound two seconds — once
+the episode ends. Untick it and playback simply stops afterwards.
+
+The bookmark is abandoned if you intervene: pressing stop, or picking a
+different track during the episode, cancels it. While it's armed the player
+shows a `↩ RESUMES` badge.
 
 To use a different show: find it on Apple Podcasts, take the numeric id from the
 URL, and ask iTunes for the real feed:
@@ -171,7 +185,7 @@ it and restores the volume immediately.
 | GET    | `/api/time`             | — (wall clock in your timezone) |
 | GET    | `/api/podcast/latest`   | `?refresh=1` to bypass cache    |
 | POST   | `/api/podcast/play`     | —                               |
-| POST   | `/api/schedule/run`     | `{job: "podcast"\|"autoStop"}`  |
+| POST   | `/api/schedule/run`     | `{job: "autoStart"\|"podcast"\|"autoStop"}` |
 | POST   | `/api/fade-stop`        | `{seconds}`                     |
 
 ## Development
@@ -241,7 +255,7 @@ If `speaker-test` is silent, the problem is the device passthrough, not this app
 npm test
 ```
 
-141 assertions, no network and no mpv required:
+168 assertions, no network and no mpv required:
 
 - `test/schedule-test.js` — timezone conversion, the fire-once-per-day rule,
   the grace window, settings validation, RSS parsing.

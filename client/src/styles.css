@@ -249,6 +249,17 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--muted); }
   color: var(--accent);
 }
 .badge.fade { background: rgba(255, 107, 107, .16); color: var(--danger); }
+.badge.resume { background: rgba(61, 220, 132, .14); color: var(--ok); }
+
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: auto !important;
+  color: var(--text) !important;
+  font-size: 13px !important;
+  cursor: pointer;
+}
 
 /* ------------------------------------------------------------- playlists */
 .playlists { flex-direction: row; }

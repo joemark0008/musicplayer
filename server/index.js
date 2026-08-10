@@ -37,7 +37,7 @@ const downloader = new Downloader({ library, playlists });
 
 // --------------------------------------------------------- scheduled jobs
 async function playTodaysEpisode() {
-  const { feedUrl, mode } = settings.get().podcast;
+  const { feedUrl, mode, resumeAfter } = settings.get().podcast;
   const { episode, feedTitle } = await fetchLatestEpisode(feedUrl, { force: true });
 
   if (mode === 'queue') {
@@ -56,13 +56,42 @@ async function playTodaysEpisode() {
     album: episode.pubDate ? new Date(episode.pubDate).toDateString() : '',
     duration: episode.duration,
     source: 'podcast',
+    resumeAfter,
   });
   return episode;
+}
+
+async function startMorningPlaylist() {
+  const cfg = settings.get().autoStart;
+
+  if (!cfg.playlist) throw new Error('no playlist chosen for auto-start');
+  if (!playlists.resolveExisting(cfg.playlist)) {
+    throw new Error(`playlist "${cfg.playlist}" no longer exists`);
+  }
+
+  const ids = playlists.tracksOf(cfg.playlist).map((t) => t.id);
+  if (!ids.length) throw new Error(`playlist "${cfg.playlist}" is empty`);
+
+  // Volume first, so the very first note is at the level you asked for.
+  if (cfg.setVolume) await player.setVolume(cfg.volume);
+
+  player.setShuffle(cfg.shuffle);
+  await player.setQueue(ids, { startIndex: cfg.shuffle ? Math.floor(Math.random() * ids.length) : 0 });
+
+  return { playlist: cfg.playlist, tracks: ids.length };
 }
 
 const scheduler = new Scheduler({
   getSettings: () => settings.get(),
   jobs: [
+    {
+      name: 'autoStart',
+      config: (s) => s.autoStart,
+      run: async () => {
+        const result = await startMorningPlaylist();
+        console.log(`[schedule] auto-start → ${result.playlist} (${result.tracks} tracks)`);
+      },
+    },
     {
       name: 'podcast',
       config: (s) => s.podcast,
@@ -388,6 +417,7 @@ async function main() {
   const s = settings.get();
   console.log(
     `[schedule] timezone ${s.timezone} (now ${zonedNow(s.timezone).label}) · ` +
+      `auto-start ${s.autoStart.enabled ? s.autoStart.time : 'off'} · ` +
       `podcast ${s.podcast.enabled ? s.podcast.time : 'off'} · ` +
       `auto-stop ${s.autoStop.enabled ? s.autoStop.time : 'off'}`
   );

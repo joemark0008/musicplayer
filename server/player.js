@@ -24,6 +24,10 @@ export class Player extends EventEmitter {
     // track" slot without polluting the queue.
     this.stream = null;
 
+    // Where the music was when a stream interrupted it, so playback can be
+    // picked back up mid-song once the episode finishes.
+    this._resume = null;
+
     // In-progress volume fade, so a user pressing play can cancel it.
     this._fade = null;
 
@@ -121,6 +125,7 @@ export class Player extends EventEmitter {
 
     this.cancelFade();
     this.stream = null;
+    this._resume = null;   // an explicit choice replaces any pending bookmark
     this.index = i;
     this.stopped = false;
     this._switching = true;
@@ -155,9 +160,28 @@ export class Player extends EventEmitter {
    * Play a URL that isn't in the library (a podcast episode).
    * mpv streams it over HTTP; nothing is written to disk.
    */
-  async playStream({ url, title, artist = '', album = '', duration = 0, source = 'stream' }) {
+  async playStream({
+    url,
+    title,
+    artist = '',
+    album = '',
+    duration = 0,
+    source = 'stream',
+    resumeAfter = false,
+  }) {
     if (!url) return this.state();
     this.cancelFade();
+
+    // Capture the bookmark *before* we clobber the current track. Rewind a
+    // couple of seconds so the song doesn't resume mid-syllable.
+    if (resumeAfter && !this.stream && !this.stopped && this.index >= 0) {
+      this._resume = {
+        index: this.index,
+        position: Math.max(0, (this.mpv.props['time-pos'] ?? 0) - 2),
+      };
+    } else if (!resumeAfter) {
+      this._resume = null;
+    }
 
     this.stream = { id: `stream:${url}`, title, artist, album, duration, source, url };
     this.index = -1;
@@ -211,9 +235,19 @@ export class Player extends EventEmitter {
   }
 
   async _advance(auto) {
-    // A podcast episode finishing means "done", not "next track".
+    // A podcast episode finishing means "done", not "next track" — either
+    // pick the music back up where it was, or stop.
     if (this.stream) {
       this.stream = null;
+      const resume = this._resume;
+      this._resume = null;
+
+      if (resume && this.queue[resume.index]) {
+        await this.playIndex(resume.index);
+        if (resume.position > 1) await this.seek(resume.position);
+        this.emit('change');
+        return this.state();
+      }
       return this.stop();
     }
     if (!this.queue.length) return;
@@ -277,6 +311,7 @@ export class Player extends EventEmitter {
     this._switching = true;
     this.stopped = true;
     this.stream = null;
+    this._resume = null;   // stopping by hand means stopped, not "resume later"
     await this.mpv.stop().catch(() => {});
     setTimeout(() => {
       this._switching = false;
@@ -325,6 +360,7 @@ export class Player extends EventEmitter {
         ? { ...track, path: undefined } // don't leak server filesystem paths
         : null,
       isStream: Boolean(this.stream),
+      willResume: Boolean(this._resume),
       fading: Boolean(this._fade),
       index: this.index,
       queue: this.queue.map((id) => {

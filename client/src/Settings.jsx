@@ -21,6 +21,7 @@ export default function SettingsView({ onNotice }) {
   const [clock, setClock] = useState(null);
   const [episode, setEpisode] = useState(null);
   const [busy, setBusy] = useState(null);
+  const [playlists, setPlaylists] = useState([]);
 
   const refresh = useCallback(async () => {
     try {
@@ -34,6 +35,7 @@ export default function SettingsView({ onNotice }) {
 
   useEffect(() => {
     refresh();
+    api.playlists().then((d) => setPlaylists(d.playlists)).catch(() => {});
     const tick = () => api.serverTime().then(setClock).catch(() => {});
     tick();
     const t = setInterval(tick, 15000);
@@ -71,6 +73,11 @@ export default function SettingsView({ onNotice }) {
   const playNow = withBusy('play', async () => {
     await api.playPodcast();
     onNotice('Playing today’s episode');
+  });
+
+  const testStart = withBusy('start', async () => {
+    await api.runJob('autoStart');
+    onNotice(`Playing "${settings.autoStart.playlist}"`);
   });
 
   const testStop = withBusy('stop', async () => {
@@ -114,6 +121,104 @@ export default function SettingsView({ onNotice }) {
           </select>
         </div>
 
+        {/* ------------------------------------------------------ auto-start */}
+        <div className="card">
+          <div className="card-head">
+            <h2>Auto-start</h2>
+            <Toggle
+              checked={settings.autoStart.enabled}
+              onChange={(enabled) => patch({ autoStart: { enabled } })}
+            />
+          </div>
+          <p className="hint">Wakes the player up and plays a playlist.</p>
+
+          <div className="field">
+            <label>Start at</label>
+            <input
+              type="time"
+              value={settings.autoStart.time}
+              onChange={(e) => patch({ autoStart: { time: e.target.value } })}
+            />
+          </div>
+
+          <div className="field">
+            <label>Days</label>
+            <DayPicker
+              value={settings.autoStart.days}
+              onChange={(days) => patch({ autoStart: { days } })}
+            />
+          </div>
+
+          <div className="field">
+            <label>Playlist</label>
+            <select
+              className="grow"
+              value={settings.autoStart.playlist}
+              onChange={(e) => patch({ autoStart: { playlist: e.target.value } })}
+            >
+              <option value="">— pick one —</option>
+              {playlists.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.name} ({p.count})
+                </option>
+              ))}
+              {/* Keep a stale name visible rather than silently swapping it. */}
+              {settings.autoStart.playlist &&
+                !playlists.some((p) => p.name === settings.autoStart.playlist) && (
+                  <option value={settings.autoStart.playlist}>
+                    {settings.autoStart.playlist} (missing)
+                  </option>
+                )}
+            </select>
+          </div>
+
+          <div className="field">
+            <label>Order</label>
+            <label className="inline-check">
+              <input
+                type="checkbox"
+                checked={settings.autoStart.shuffle}
+                onChange={(e) => patch({ autoStart: { shuffle: e.target.checked } })}
+              />
+              shuffle
+            </label>
+          </div>
+
+          <div className="field">
+            <label>Volume</label>
+            <label className="inline-check">
+              <input
+                type="checkbox"
+                checked={settings.autoStart.setVolume}
+                onChange={(e) => patch({ autoStart: { setVolume: e.target.checked } })}
+              />
+              set to
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={settings.autoStart.volume}
+              disabled={!settings.autoStart.setVolume}
+              onChange={(e) => patch({ autoStart: { volume: Number(e.target.value) } })}
+            />
+          </div>
+
+          {settings.autoStart.enabled && !settings.autoStart.playlist && (
+            <div className="next off">Pick a playlist, or nothing will happen.</div>
+          )}
+          <NextRun status={jobStatus('autoStart')} />
+
+          <div className="card-actions">
+            <button
+              onClick={testStart}
+              disabled={busy === 'start' || !settings.autoStart.playlist}
+            >
+              {busy === 'start' ? 'Starting…' : 'Start it now'}
+            </button>
+          </div>
+        </div>
+
         {/* -------------------------------------------------------- podcast */}
         <div className="card">
           <div className="card-head">
@@ -125,7 +230,7 @@ export default function SettingsView({ onNotice }) {
           </div>
           <p className="hint">
             Reads the feed at the scheduled time and plays whatever episode is newest — so it
-            follows the show forward on its own. Interrupts music, then stops when the episode ends.
+            follows the show forward on its own.
           </p>
 
           <div className="field">
@@ -143,6 +248,18 @@ export default function SettingsView({ onNotice }) {
               value={settings.podcast.days}
               onChange={(days) => patch({ podcast: { days } })}
             />
+          </div>
+
+          <div className="field">
+            <label>Afterwards</label>
+            <label className="inline-check">
+              <input
+                type="checkbox"
+                checked={settings.podcast.resumeAfter}
+                onChange={(e) => patch({ podcast: { resumeAfter: e.target.checked } })}
+              />
+              resume the music where it left off
+            </label>
           </div>
 
           <div className="field">

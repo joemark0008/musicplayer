@@ -234,6 +234,47 @@ async function main() {
 
       s = await get('/api/state');
       check('interrupting leaves the queue intact', s.queue.length === 3);
+
+      console.log('\nResuming music after the episode');
+      // Play track 2, get a few seconds in, then let the podcast interrupt.
+      await put('/api/settings', { podcast: { resumeAfter: true } });
+      await post('/api/queue', { ids });
+      await post('/api/play', { index: 1 });
+      await sleep(1200);
+      const before = await get('/api/state');
+      check('music is playing before the interruption', before.playing && before.index === 1);
+
+      s = await post('/api/podcast/play');
+      check('the bookmark is armed', s.willResume === true);
+      check('podcast is playing', s.isStream === true);
+
+      await sleep(4200);            // fake episode is 3s long
+      s = await get('/api/state');
+      check('music resumes when the episode ends', s.isStream === false && s.playing === true);
+      check('it resumes the same track', s.index === 1, `index ${s.index}`);
+      check('the bookmark is cleared afterwards', s.willResume === false);
+
+      // With the setting off, it should stop instead.
+      await put('/api/settings', { podcast: { resumeAfter: false } });
+      await post('/api/queue', { ids });
+      await post('/api/play', { index: 0 });
+      await sleep(600);
+      s = await post('/api/podcast/play');
+      check('no bookmark when the setting is off', s.willResume === false);
+      await sleep(4200);
+      s = await get('/api/state');
+      check('it stops instead of resuming', s.stopped === true && s.playing === false);
+
+      // A manual stop during the episode must cancel the pending resume.
+      await put('/api/settings', { podcast: { resumeAfter: true } });
+      await post('/api/queue', { ids });
+      await post('/api/play', { index: 0 });
+      await sleep(600);
+      await post('/api/podcast/play');
+      s = await post('/api/stop');
+      check('stopping by hand cancels the pending resume', s.willResume === false);
+      await sleep(1000);
+      check('and nothing starts playing later', (await get('/api/state')).playing === false);
     } finally {
       srv.close();
     }
@@ -268,6 +309,49 @@ async function main() {
     check('fadeSeconds 0 stops instantly', s.stopped === true);
     s = await post('/api/schedule/run', { job: 'nope' });
     check('unknown jobs are rejected', Boolean(s.error));
+
+    console.log('\nAuto-start');
+    cfg = await get('/api/settings');
+    check('defaults to 08:00, disabled', cfg.settings.autoStart.time === '08:00'
+      && cfg.settings.autoStart.enabled === false);
+    check('has no playlist until you pick one', cfg.settings.autoStart.playlist === '');
+
+    // Refuses to fire with nothing selected, rather than doing something random.
+    await put('/api/settings', { autoStart: { enabled: true } });
+    s = await post('/api/schedule/run', { job: 'autoStart' });
+    check('errors when no playlist is chosen', /no playlist/.test(s.error || ''), JSON.stringify(s));
+
+    s = await put('/api/settings', { autoStart: { playlist: 'Ghost Playlist' } });
+    check('a missing playlist name is still stored', s.settings.autoStart.playlist === 'Ghost Playlist');
+    s = await post('/api/schedule/run', { job: 'autoStart' });
+    check('errors when the playlist no longer exists', /no longer exists/.test(s.error || ''), JSON.stringify(s));
+
+    // Build a real playlist out of the library and start it.
+    await post('/api/playlists', { name: 'Morning' });
+    await post('/api/playlists/Morning/tracks', { ids });
+    await post('/api/stop');
+    await post('/api/volume', { volume: 95 });
+    await put('/api/settings', { autoStart: { playlist: 'Morning', volume: 42, setVolume: true, shuffle: false } });
+
+    s = await post('/api/schedule/run', { job: 'autoStart' });
+    check('queues the playlist', s.queue.length === 3, String(s.queue.length));
+    check('starts playing', s.playing === true);
+    check('starts at the first track', s.index === 0);
+    check('applies the configured volume', Math.round(s.volume) === 42, `got ${s.volume}`);
+    check('plays the playlist copies, not the originals',
+      s.queue.every((t) => t.id.startsWith('Playlists/Morning/')), s.queue[0]?.id);
+
+    await put('/api/settings', { autoStart: { setVolume: false } });
+    await post('/api/volume', { volume: 77 });
+    s = await post('/api/schedule/run', { job: 'autoStart' });
+    check('leaves the volume alone when told to', Math.round(s.volume) === 77, `got ${s.volume}`);
+
+    await put('/api/settings', { autoStart: { shuffle: true } });
+    s = await post('/api/schedule/run', { job: 'autoStart' });
+    check('shuffle mode is switched on', s.shuffle === true);
+
+    await post('/api/playlists/Morning/delete', { force: true });
+    await put('/api/settings', { autoStart: { enabled: false, shuffle: false } });
   } finally {
     cleanup();
   }

@@ -15,6 +15,16 @@ export const DEFAULTS = {
   // Philippine time. No DST, permanently UTC+8.
   timezone: 'Asia/Manila',
 
+  autoStart: {
+    enabled: false,
+    time: '08:00',
+    days: [0, 1, 2, 3, 4, 5, 6],
+    playlist: '',        // empty = nothing to play, job warns instead
+    shuffle: false,
+    volume: 60,          // set at start so last night's level can't ambush you
+    setVolume: true,
+  },
+
   autoStop: {
     enabled: false,
     time: '22:00',       // 24-hour, in `timezone`
@@ -27,8 +37,10 @@ export const DEFAULTS = {
     time: '15:00',
     days: [0, 1, 2, 3, 4, 5, 6],
     feedUrl: 'https://feeds.transistor.fm/our-daily-bread-podcast',
-    // 'interrupt' — stop whatever is playing, play today's episode, then stop.
+    // 'interrupt' — stop whatever is playing and play today's episode.
     mode: 'interrupt',
+    // Pick the music back up, mid-song, once the episode ends.
+    resumeAfter: true,
   },
 };
 
@@ -50,7 +62,7 @@ function clean(patch, current) {
     next.timezone = patch.timezone;
   }
 
-  for (const key of ['autoStop', 'podcast']) {
+  for (const key of ['autoStart', 'autoStop', 'podcast']) {
     const p = patch[key];
     if (!p || typeof p !== 'object') continue;
 
@@ -59,6 +71,18 @@ function clean(patch, current) {
     if (Array.isArray(p.days)) {
       const days = [...new Set(p.days.map(Number).filter((d) => d >= 0 && d <= 6))].sort();
       if (days.length) next[key].days = days;
+    }
+  }
+
+  if (patch.autoStart) {
+    const p = patch.autoStart;
+    // The playlist name is validated against what exists at run time, not
+    // here — a playlist can be renamed long after it was chosen.
+    if (typeof p.playlist === 'string') next.autoStart.playlist = p.playlist.slice(0, 80);
+    if (typeof p.shuffle === 'boolean') next.autoStart.shuffle = p.shuffle;
+    if (typeof p.setVolume === 'boolean') next.autoStart.setVolume = p.setVolume;
+    if (Number.isFinite(Number(p.volume))) {
+      next.autoStart.volume = Math.max(0, Math.min(100, Math.round(Number(p.volume))));
     }
   }
 
@@ -75,6 +99,9 @@ function clean(patch, current) {
       }
     }
     if (['interrupt', 'queue'].includes(patch.podcast.mode)) next.podcast.mode = patch.podcast.mode;
+    if (typeof patch.podcast.resumeAfter === 'boolean') {
+      next.podcast.resumeAfter = patch.podcast.resumeAfter;
+    }
   }
 
   return next;

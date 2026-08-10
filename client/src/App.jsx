@@ -350,6 +350,7 @@ function NowPlaying({ state, setState, onError }) {
       <div className="np">
         <div className="np-title">
           {state.isStream && <span className="badge">PODCAST</span>}
+          {state.willResume && <span className="badge resume">↩ RESUMES</span>}
           {state.fading && <span className="badge fade">FADING OUT</span>}
           {state.track?.title || 'Nothing playing'}
         </div>
