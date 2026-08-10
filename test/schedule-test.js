@@ -121,6 +121,47 @@ console.log('\nScheduler');
   check('reports a next-run label', status.jobs[0].nextRun === 'today at 15:00', status.jobs[0].nextRun);
 }
 
+/* ------------------------------------- regression: editing a live schedule */
+console.log('\nEditing a schedule re-arms the job');
+{
+  // Reproduces a real failure: the service booted with auto-stop at 22:00,
+  // the user later moved it to 16:00, and the boot-time "already past its
+  // window" mark (keyed only on the date) suppressed the 16:00 run.
+  const fired = [];
+  const settings = {
+    timezone: 'Asia/Manila',
+    autoStop: { enabled: true, time: '12:00', days: [0, 1, 2, 3, 4, 5, 6] },
+  };
+  const sched = new Scheduler({
+    getSettings: () => settings,
+    jobs: [{ name: 'autoStop', config: (s) => s.autoStop, run: async () => fired.push(1) }],
+  });
+
+  // Boot at 13:01 PH — 61 minutes past the 12:00 setting, so it's marked handled.
+  const boot = new Date('2026-08-10T05:01:00Z');
+  sched.getSettings = () => settings;
+  const now = zonedNow('Asia/Manila', boot);
+  sched.lastRun.set('autoStop', sched.runKey(now, settings.autoStop));
+
+  check('a past-due job is marked handled at boot',
+    sched.status(boot).jobs[0].ranToday === true);
+
+  // User edits the time to 16:00.
+  settings.autoStop.time = '16:00';
+  check('editing the time clears the stale ranToday flag',
+    sched.status(boot).jobs[0].ranToday === false);
+
+  await sched.tick(new Date('2026-08-10T08:00:00Z')); // 16:00 PH
+  check('the job fires at the new time', fired.length === 1, `fired ${fired.length}x`);
+
+  await sched.tick(new Date('2026-08-10T08:05:00Z'));
+  check('and still only fires once', fired.length === 1);
+
+  // Changing the day list re-arms too.
+  settings.autoStop.days = [1];
+  check('editing the days also re-arms', sched.status(new Date('2026-08-10T08:05:00Z')).jobs[0].ranToday === false);
+}
+
 /* ------------------------------------------------------------- settings */
 console.log('\nSettings validation');
 {

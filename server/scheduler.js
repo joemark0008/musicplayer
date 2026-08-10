@@ -58,9 +58,21 @@ export class Scheduler extends EventEmitter {
     this.jobs = jobs;
     this.graceMinutes = graceMinutes;
     this.intervalMs = intervalMs;
-    this.lastRun = new Map();  // job name -> 'YYYY-MM-DD'
+    this.lastRun = new Map();  // job name -> runKey()
     this.running = new Set();
     this.timer = null;
+  }
+
+  /**
+   * The "already handled today" marker.
+   *
+   * Keyed on the schedule as well as the date: editing the time in the UI
+   * must re-arm the job. Keying on the date alone meant that changing
+   * "22:00" to "16:00" at lunchtime left the morning's boot-time
+   * "already past its window" mark in place, silently suppressing the run.
+   */
+  runKey(now, cfg) {
+    return `${now.date}@${cfg.time}@${[...cfg.days].sort().join('')}`;
   }
 
   start() {
@@ -71,7 +83,7 @@ export class Scheduler extends EventEmitter {
     for (const job of this.jobs) {
       const cfg = job.config(settings);
       if (now.minutes - parseTime(cfg.time) > this.graceMinutes) {
-        this.lastRun.set(job.name, now.date);
+        this.lastRun.set(job.name, this.runKey(now, cfg));
       }
     }
 
@@ -94,7 +106,9 @@ export class Scheduler extends EventEmitter {
       const cfg = job.config(settings);
       if (!cfg.enabled) continue;
       if (!cfg.days.includes(now.weekday)) continue;
-      if (this.lastRun.get(job.name) === now.date) continue;
+
+      const key = this.runKey(now, cfg);
+      if (this.lastRun.get(job.name) === key) continue;
       if (this.running.has(job.name)) continue;
 
       const delta = now.minutes - parseTime(cfg.time);
@@ -102,12 +116,12 @@ export class Scheduler extends EventEmitter {
 
       // Past the grace window (server was asleep, clock jumped): skip today.
       if (delta > this.graceMinutes) {
-        this.lastRun.set(job.name, now.date);
+        this.lastRun.set(job.name, key);
         this.emit('missed', { job: job.name, date: now.date, lateBy: delta });
         continue;
       }
 
-      this.lastRun.set(job.name, now.date);
+      this.lastRun.set(job.name, key);
       this.running.add(job.name);
       this.emit('fire', { job: job.name, at: now.label });
       try {
@@ -135,7 +149,7 @@ export class Scheduler extends EventEmitter {
           enabled: cfg.enabled,
           time: cfg.time,
           days: cfg.days,
-          ranToday: this.lastRun.get(job.name) === now.date,
+          ranToday: this.lastRun.get(job.name) === this.runKey(now, cfg),
           nextRun: cfg.enabled ? nextRunLabel(cfg, now) : null,
         };
       }),
