@@ -22,7 +22,10 @@ const EMPTY_STATE = {
 export default function App() {
   const [state, setState] = useState(EMPTY_STATE);
   const [tracks, setTracks] = useState([]);
-  const [libraryInfo, setLibraryInfo] = useState({ total: 0, root: '', tagSupport: true });
+  const [libraryInfo, setLibraryInfo] = useState({
+    total: 0, root: '', tagSupport: true, inPlaylists: 0,
+  });
+  const [includePlaylists, setIncludePlaylists] = useState(false);
   const [query, setQuery] = useState('');
   const [socketStatus, setSocketStatus] = useState('connecting');
   const [notice, setNotice] = useState(null);
@@ -35,13 +38,18 @@ export default function App() {
   // ---------------------------------------------------------- data load
   const loadLibrary = useCallback(async () => {
     try {
-      const data = await api.library();
+      const data = await api.library('', includePlaylists);
       setTracks(data.tracks);
-      setLibraryInfo({ total: data.total, root: data.root, tagSupport: data.tagSupport });
+      setLibraryInfo({
+        total: data.total,
+        root: data.root,
+        tagSupport: data.tagSupport,
+        inPlaylists: data.inPlaylists,
+      });
     } catch (err) {
       setNotice(err.message);
     }
-  }, []);
+  }, [includePlaylists]);
 
   const loadPlaylists = useCallback(() => {
     api.playlists().then((d) => setPlaylists(d.playlists)).catch(() => {});
@@ -157,6 +165,9 @@ export default function App() {
             tracks={filtered}
             total={libraryInfo.total}
             root={libraryInfo.root}
+            inPlaylists={libraryInfo.inPlaylists}
+            includePlaylists={includePlaylists}
+            setIncludePlaylists={setIncludePlaylists}
             query={query}
             setQuery={setQuery}
             currentId={state.track?.id}
@@ -196,7 +207,8 @@ export default function App() {
 
 /* ------------------------------------------------------------------ library */
 function LibraryView({
-  tracks, total, root, query, setQuery, currentId,
+  tracks, total, root, inPlaylists, includePlaylists, setIncludePlaylists,
+  query, setQuery, currentId,
   onPlay, onEnqueue, onPlayAll, onQueueAll,
   playlists, onPlaylistsChanged, onNotice,
 }) {
@@ -210,16 +222,38 @@ function LibraryView({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+        {inPlaylists > 0 && (
+          <label className="inline-check" title="Playlist tracks are hidden by default so nothing appears twice">
+            <input
+              type="checkbox"
+              checked={includePlaylists}
+              onChange={(e) => setIncludePlaylists(e.target.checked)}
+            />
+            include playlists
+          </label>
+        )}
         <div className="panel-actions">
           <button onClick={onPlayAll} disabled={!tracks.length}>Play all</button>
           <button className="ghost" onClick={onQueueAll} disabled={!tracks.length}>Queue all</button>
         </div>
       </div>
 
-      {!total && (
+      {!total && inPlaylists > 0 && (
         <p className="empty">
-          No audio files found in <code>{root}</code>. Point <code>MUSIC_DIR</code> at your music
-          folder and hit Rescan.
+          Nothing loose in <code>{root}</code> — all {inPlaylists} of your tracks live inside
+          playlists, which are hidden here so songs don't appear twice.
+          <br />
+          <br />
+          Open the <strong>Playlists</strong> tab to play them, tick{' '}
+          <strong>include playlists</strong> above to list them here, or drop files straight
+          into <code>{root}</code> and hit Rescan.
+        </p>
+      )}
+
+      {!total && !inPlaylists && (
+        <p className="empty">
+          No audio files found in <code>{root}</code>. Copy music there and hit Rescan, or
+          download something in the <strong>Playlists</strong> tab.
         </p>
       )}
 

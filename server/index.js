@@ -151,6 +151,10 @@ app.get('/api/library', (req, res) => {
     root: MUSIC_DIR,
     count: tracks.length,
     total: library.tracks.filter(visible).length,
+    // So the UI can say "your music is all in playlists" rather than the
+    // misleading "no audio files found".
+    inPlaylists: library.tracks.filter((t) => playlists.isPlaylistTrack(t.id)).length,
+    includingPlaylists: includePlaylists,
     lastScan: library.lastScan,
     tagSupport: hasTagSupport,
     tracks: tracks.map((t) => ({ ...t, path: undefined })),

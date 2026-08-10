@@ -25,7 +25,13 @@ async function request(method, url, body) {
 
 export const api = {
   state: () => request('GET', '/api/state'),
-  library: (q = '') => request('GET', `/api/library${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  library: (q = '', includePlaylists = false) => {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (includePlaylists) params.set('include', 'playlists');
+    const qs = params.toString();
+    return request('GET', `/api/library${qs ? `?${qs}` : ''}`);
+  },
   rescan: () => request('POST', '/api/library/scan'),
 
   play: (payload = {}) => request('POST', '/api/play', payload),

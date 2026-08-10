@@ -128,6 +128,8 @@ async function main() {
       JSON.stringify(song1));
     check('never exposes server filesystem paths', lib.tracks.every((t) => t.path === undefined));
     check('search filters', (await get('/api/library?q=three')).count === 1);
+    check('reports how many tracks are hidden inside playlists', lib.inPlaylists === 0,
+      String(lib.inPlaylists));
 
     console.log('\nQueue and playback');
     const ids = lib.tracks.map((t) => t.id);
@@ -340,6 +342,15 @@ async function main() {
     check('applies the configured volume', Math.round(s.volume) === 42, `got ${s.volume}`);
     check('plays the playlist copies, not the originals',
       s.queue.every((t) => t.id.startsWith('Playlists/Morning/')), s.queue[0]?.id);
+
+    // The "my library looks empty" case: everything lives inside playlists.
+    const hidden = await get('/api/library');
+    check('playlist tracks stay out of the main library list', hidden.total === 3, String(hidden.total));
+    check('but are counted so the UI can explain why', hidden.inPlaylists === 3,
+      String(hidden.inPlaylists));
+    const shown = await get('/api/library?include=playlists');
+    check('include=playlists reveals them', shown.total === 6, String(shown.total));
+    check('and flags that it did', shown.includingPlaylists === true);
 
     await put('/api/settings', { autoStart: { setVolume: false } });
     await post('/api/volume', { volume: 77 });
