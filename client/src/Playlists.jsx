@@ -10,6 +10,7 @@ export default function PlaylistsView({ onNotice, currentId, downloads, refreshS
   const [wholePlaylist, setWholePlaylist] = useState(false);
   const [ytdlp, setYtdlp] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [dismissed, setDismissed] = useState([]);   // finished jobs hidden by the user
 
   const loadPlaylists = useCallback(async () => {
     try {
@@ -113,8 +114,12 @@ export default function PlaylistsView({ onNotice, currentId, downloads, refreshS
     }
   };
 
-  const active = downloads.filter((j) => ['queued', 'running'].includes(j.status));
-  const recent = downloads.filter((j) => !['queued', 'running'].includes(j.status)).slice(0, 5);
+  // Only this playlist's downloads. The server keeps one global history, and
+  // showing all of it here made jobs from other playlists look like they
+  // belonged to the one you're looking at.
+  const mine = downloads.filter((j) => j.playlist === selected && !dismissed.includes(j.id));
+  const active = mine.filter((j) => ['queued', 'running'].includes(j.status));
+  const recent = mine.filter((j) => !['queued', 'running'].includes(j.status)).slice(0, 5);
 
   return (
     <section className="panel playlists">
@@ -224,10 +229,27 @@ export default function PlaylistsView({ onNotice, currentId, downloads, refreshS
                     <div className="dl-row">
                       <span className="dl-title">{job.title || job.url}</span>
                       <span className="dl-pct">{job.status === 'error' ? 'failed' : job.status}</span>
+                      <button
+                        className="ghost"
+                        title="Dismiss"
+                        onClick={() => setDismissed((d) => [...d, job.id])}
+                      >
+                        ✕
+                      </button>
                     </div>
                     {job.error && <div className="dl-error">{job.error}</div>}
                   </li>
                 ))}
+                {recent.length > 1 && (
+                  <li className="dl-clear">
+                    <button
+                      className="ghost"
+                      onClick={() => setDismissed((d) => [...d, ...recent.map((j) => j.id)])}
+                    >
+                      Clear finished
+                    </button>
+                  </li>
+                )}
               </ul>
             )}
 

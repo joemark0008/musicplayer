@@ -134,6 +134,17 @@ app.use('/api', (req, res, next) => {
   res.status(401).json({ error: 'unauthorized' });
 });
 
+/**
+ * Rescan, then tell every open browser to reload its lists.
+ *
+ * Without the push, deleting a playlist left it sitting in other tabs'
+ * sidebars until a manual refresh — the folder was gone, the UI disagreed.
+ */
+async function afterLibraryChange() {
+  await library.scan();
+  push({ type: 'library-changed' });
+}
+
 const ok = (res, promise) =>
   Promise.resolve(promise)
     .then((data) => res.json(data ?? player.state()))
@@ -162,7 +173,13 @@ app.get('/api/library', (req, res) => {
 });
 
 app.post('/api/library/scan', (req, res) =>
-  ok(res, library.scan().then((t) => ({ scanned: t.length, lastScan: library.lastScan })))
+  ok(
+    res,
+    afterLibraryChange().then(() => ({
+      scanned: library.tracks.length,
+      lastScan: library.lastScan,
+    }))
+  )
 );
 
 // ------------------------------------------------------------- playback
@@ -207,11 +224,17 @@ app.get('/api/playlists/:name', (req, res) =>
 );
 
 app.post('/api/playlists', (req, res) =>
-  ok(res, playlists.create(req.body?.name).then((name) => ({ name })))
+  ok(res, playlists.create(req.body?.name).then(async (name) => {
+    push({ type: 'library-changed' });
+    return { name };
+  }))
 );
 
 app.post('/api/playlists/:name/rename', (req, res) =>
-  ok(res, playlists.rename(req.params.name, req.body?.name).then((name) => ({ name })))
+  ok(res, playlists.rename(req.params.name, req.body?.name).then(async (name) => {
+    await afterLibraryChange();
+    return { name };
+  }))
 );
 
 app.post('/api/playlists/:name/delete', (req, res) =>
@@ -220,7 +243,7 @@ app.post('/api/playlists/:name/delete', (req, res) =>
     playlists
       .remove(req.params.name, { force: req.body?.force === true })
       .then(async (name) => {
-        await library.scan();
+        await afterLibraryChange();
         return { deleted: name };
       })
   )
@@ -230,7 +253,7 @@ app.post('/api/playlists/:name/tracks', (req, res) =>
   ok(
     res,
     playlists.addTracks(req.params.name, req.body?.ids || []).then(async (result) => {
-      await library.scan();
+      await afterLibraryChange();
       return result;
     })
   )
@@ -242,7 +265,7 @@ app.post('/api/playlists/:name/tracks/remove', (req, res) =>
     playlists
       .removeTrack(req.params.name, req.body?.id, { force: req.body?.force === true })
       .then(async (id) => {
-        await library.scan();
+        await afterLibraryChange();
         return { removed: id };
       })
   )

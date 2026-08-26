@@ -41,6 +41,15 @@ async function main() {
     process.exit(1);
   }
 
+  // Exits 0 but writes nothing — what a partial YouTube 403 looks like.
+  if (url.endsWith('/silentfail')) {
+    console.log('[youtube] Extracting URL: ' + url);
+    console.log(`[download] Destination: ${target}`);
+    console.log('[download]  42.0% of 3.42MiB at 1.20MiB/s ETA 00:02');
+    console.error('WARNING: unable to download video data: HTTP Error 403: Forbidden');
+    process.exit(0);
+  }
+
   if (url.endsWith('/noffmpeg')) {
     console.error('ERROR: ffprobe and ffmpeg not found. Please install or provide the path');
     process.exit(1);

@@ -198,14 +198,21 @@ export class Downloader extends EventEmitter {
             .filter((f) => !before.has(f))
             .map((f) => fs.unlink(path.join(dir, f)).catch(() => {}))
         );
-      } else if (code === 0 || created.length) {
+      } else if (created.length || job.alreadyHad) {
         job.status = 'done';
         job.progress = 100;
         job.files = created;
         if (!job.title && created.length) job.title = path.parse(created[0]).name;
       } else {
+        // A clean exit code with nothing on disk still means failure. YouTube
+        // 403s partway through look exactly like this, and reporting them as
+        // "done" left an empty playlist with no explanation.
         job.status = 'error';
-        job.error = firstUsefulError(stderr) || `yt-dlp exited with code ${code}`;
+        job.error =
+          firstUsefulError(stderr) ||
+          (code === 0
+            ? 'yt-dlp reported success but wrote no audio file — usually a partial block from YouTube. Try updating it: pipx upgrade yt-dlp'
+            : `yt-dlp exited with code ${code}`);
       }
 
       job.finishedAt = new Date().toISOString();
@@ -241,6 +248,7 @@ export class Downloader extends EventEmitter {
     if (already) {
       job.title = path.parse(already[1].trim()).name;
       job.progress = 100;
+      job.alreadyHad = true;   // nothing new on disk, but not a failure
       changed = true;
     }
 
