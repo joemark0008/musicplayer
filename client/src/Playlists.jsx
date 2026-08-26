@@ -213,13 +213,20 @@ export default function PlaylistsView({ onNotice, currentId, downloads, refreshS
                         {job.item && <span className="dl-item"> · item {job.item}</span>}
                       </span>
                       <span className="dl-pct">
-                        {job.status === 'queued' ? 'queued' : `${job.progress.toFixed(0)}%`}
+                        {job.status === 'queued'
+                          ? 'queued'
+                          : job.progress > 0
+                            ? `${job.progress.toFixed(0)}%`
+                            : 'starting…'}
                       </span>
                       <button className="ghost" onClick={() => api.cancelDownload(job.id).catch(() => {})}>
                         ✕
                       </button>
                     </div>
-                    <div className="dl-bar">
+                    {/* Before yt-dlp reports a percentage there's nothing to
+                        fill, so show a moving stripe rather than an empty bar
+                        that looks like a stall. */}
+                    <div className={`dl-bar ${job.progress > 0 ? '' : 'indeterminate'}`}>
                       <div className="dl-fill" style={{ width: `${job.progress}%` }} />
                     </div>
                   </li>
@@ -236,6 +243,14 @@ export default function PlaylistsView({ onNotice, currentId, downloads, refreshS
                       >
                         ✕
                       </button>
+                    </div>
+                    {/* Keep the bar after completion — a finished row with no
+                        bar reads as "nothing happened". */}
+                    <div className="dl-bar">
+                      <div
+                        className={`dl-fill ${job.status}`}
+                        style={{ width: job.status === 'done' ? '100%' : `${job.progress}%` }}
+                      />
                     </div>
                     {job.error && <div className="dl-error">{job.error}</div>}
                   </li>

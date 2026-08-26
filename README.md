@@ -76,9 +76,13 @@ without ceremony since the original is untouched.
 Requires `yt-dlp` and `ffmpeg` on the server:
 
 ```bash
-brew install yt-dlp ffmpeg          # macOS
-sudo apt install ffmpeg && pipx install yt-dlp   # Debian/Ubuntu
+brew install yt-dlp ffmpeg atomicparsley                      # macOS
+sudo apt install ffmpeg atomicparsley && pipx install yt-dlp   # Debian/Ubuntu
 ```
+
+`atomicparsley` is what embeds cover art into m4a. Without it yt-dlp downloads
+the thumbnail, fails to embed it, and leaves a stray `.webp` in your playlist
+folder. The server deletes those strays either way, but you lose the artwork.
 
 Debian's `yt-dlp` package lags badly and breaks when YouTube changes; `pipx`
 or the [standalone binary](https://github.com/yt-dlp/yt-dlp/releases) is worth

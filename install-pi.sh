@@ -138,9 +138,12 @@ have apt-get || die "This installer expects a Debian-based OS (Raspberry Pi OS, 
 # -------------------------------------------------------------- dependencies
 if [[ $SKIP_DEPS -eq 0 ]]; then
   step "Installing system packages"
-  info "mpv (playback), ffmpeg (audio extraction), curl, git"
+  info "mpv (playback), ffmpeg (audio extraction), AtomicParsley (cover art), curl, git"
   run sudo apt-get update
-  run sudo apt-get install -y --no-install-recommends mpv ffmpeg curl git alsa-utils
+  # AtomicParsley is what yt-dlp uses to embed cover art into m4a files.
+  # Without it, every download leaves a stray .webp next to the track.
+  run sudo apt-get install -y --no-install-recommends \
+    mpv ffmpeg atomicparsley curl git alsa-utils
   ok "System packages ready"
 
   step "Checking Node.js"

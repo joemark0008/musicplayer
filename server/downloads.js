@@ -19,6 +19,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { AUDIO_EXT } from './library.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -186,9 +187,19 @@ export class Downloader extends EventEmitter {
       const cancelled = this.current?.cancelled;
       this.current = null;
 
-      // Anything new in the folder is ours, whatever yt-dlp printed.
       const after = await fs.readdir(dir).catch(() => []);
-      const created = after.filter((f) => !before.has(f) && !f.endsWith('.part'));
+      const appeared = after.filter((f) => !before.has(f) && !f.endsWith('.part'));
+
+      // Only audio counts as success. yt-dlp fetches the thumbnail first, so
+      // a failed download still leaves a .webp behind — treating that as
+      // "created a file" reported broken downloads as done.
+      const created = appeared.filter((f) => AUDIO_EXT.has(path.extname(f).toLowerCase()));
+
+      // Thumbnails are only meant to be embedded, not kept. They survive when
+      // AtomicParsley is missing (m4a embedding needs it) or when the audio
+      // never arrived. Either way they're litter in a music folder.
+      const litter = appeared.filter((f) => !AUDIO_EXT.has(path.extname(f).toLowerCase()));
+      await Promise.all(litter.map((f) => fs.unlink(path.join(dir, f)).catch(() => {})));
 
       if (cancelled) {
         job.status = 'cancelled';

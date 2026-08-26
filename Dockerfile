@@ -19,6 +19,7 @@ RUN apt-get update \
       libasound2-plugins \
       alsa-utils \
       ffmpeg \
+      atomicparsley \
       ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 

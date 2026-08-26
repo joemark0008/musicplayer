@@ -50,6 +50,16 @@ async function main() {
     process.exit(0);
   }
 
+  // Fetches the thumbnail, then 403s before the audio arrives — leaving a
+  // stray .webp and no track, exactly like a real blocked download.
+  if (url.endsWith('/thumbonly')) {
+    console.log('[youtube] Extracting URL: ' + url);
+    fs.writeFileSync(path.join(dir, `Fake ${name}.webp`), 'thumbnail bytes');
+    console.log('[download]  12.0% of 3.42MiB at 1.20MiB/s ETA 00:08');
+    console.error('WARNING: unable to download video data: HTTP Error 403: Forbidden');
+    process.exit(0);
+  }
+
   if (url.endsWith('/noffmpeg')) {
     console.error('ERROR: ffprobe and ffmpeg not found. Please install or provide the path');
     process.exit(1);

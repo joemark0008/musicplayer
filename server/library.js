@@ -8,7 +8,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const AUDIO_EXT = new Set([
+export const AUDIO_EXT = new Set([
   '.mp3', '.flac', '.m4a', '.aac', '.ogg', '.oga', '.opus',
   '.wav', '.wma', '.alac', '.aiff', '.aif', '.mp4', '.m4b',
 ]);
